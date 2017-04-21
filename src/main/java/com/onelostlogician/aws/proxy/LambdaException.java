@@ -2,7 +2,7 @@ package com.onelostlogician.aws.proxy;
 
 import java.util.Objects;
 
-class LambdaException extends Exception {
+public class LambdaException extends Exception {
     private final ApiGatewayProxyResponse response;
 
     LambdaException(ApiGatewayProxyResponse response) {

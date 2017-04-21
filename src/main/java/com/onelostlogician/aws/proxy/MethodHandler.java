@@ -10,7 +10,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.function.Function;
 
-import static com.onelostlogician.aws.proxy.ApiGatewayProxyResponse.*;
+import static com.onelostlogician.aws.proxy.ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder;
 import static java.util.Objects.requireNonNull;
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 import static javax.ws.rs.core.Response.Status.UNSUPPORTED_MEDIA_TYPE;
