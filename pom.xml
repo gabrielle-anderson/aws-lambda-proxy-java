@@ -7,6 +7,18 @@
     <groupId>com.github.gabrielle-anderson</groupId>
     <artifactId>aws-lambda-proxy-java</artifactId>
     <version>1.0</version>
+    <packaging>jar</packaging>
+    <developers>
+        <developer>
+            <name>Gabrielle Anderson</name>
+            <email>gabrielle.anderson.ba@gmail.com</email>
+            <timezone>+0</timezone>
+        </developer>
+    </developers>
+    <name>aws-lambda-proxy-java</name>
+    <description>Templates to simplify the writing of Java request-handlers for use with AWS Api-Gateway methods that use Lambda Proxy-Integration.
+    </description>
+    <url>https://github.com/gabrielle-anderson/aws-lambda-proxy-java</url>
 
     <licenses>
         <license>
