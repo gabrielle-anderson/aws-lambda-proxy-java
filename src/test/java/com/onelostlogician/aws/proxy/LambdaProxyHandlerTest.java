@@ -2,7 +2,7 @@ package com.onelostlogician.aws.proxy;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.LambdaLogger;
-import com.googlecode.junittoolbox.ParallelRunner;
+import com.googlecode.junittoolbox.ParallelParameterized;
 import com.onelostlogician.aws.proxy.fixtures.ApiGatewayProxyRequestBuilder;
 import com.onelostlogician.aws.proxy.fixtures.SampleMethodHandler;
 import com.onelostlogician.aws.proxy.fixtures.TestingLogger;
@@ -12,14 +12,18 @@ import org.json.simple.parser.ParseException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import javax.ws.rs.core.MediaType;
 import java.io.IOException;
 import java.util.*;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static javax.ws.rs.core.HttpHeaders.ACCEPT;
 import static javax.ws.rs.core.HttpHeaders.CONTENT_TYPE;
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON_TYPE;
@@ -29,20 +33,32 @@ import static org.assertj.core.api.Java6Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-@RunWith(ParallelRunner.class)
+@RunWith(ParallelParameterized.class)
 public class LambdaProxyHandlerTest {
     private static final MediaType METHOD_CONTENT_TYPE = APPLICATION_JSON_TYPE;
     private static final MediaType METHOD_ACCEPT = TEXT_PLAIN_TYPE;
     private static final String METHOD = "GET";
-    public static final String ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method";
-    public static final String ACCESS_CONTROL_REQUEST_HEADERS = "Access-Control-Request-Headers";
+    private static final String ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method";
+    private static final String ACCESS_CONTROL_REQUEST_HEADERS = "Access-Control-Request-Headers";
+
+    private final LambdaProxyHandler<Configuration> handler;
 
     private Configuration configuration = mock(Configuration.class);
-    private LambdaProxyHandler<Configuration> handler = new TestLambdaProxyHandler(false);
     private Context context = mock(Context.class);
     private LambdaLogger logger = new TestingLogger();
     private MethodHandler methodHandler = mock(MethodHandler.class);
     private Function<Configuration, MethodHandler> constructor = c -> methodHandler;
+
+    public LambdaProxyHandlerTest(boolean optionsSupport) {
+        handler = new TestLambdaProxyHandler(optionsSupport);
+    }
+
+    @Parameterized.Parameters
+    public static Collection<Object[]> data() {
+        return Stream.of(true, false)
+                .map(b -> singleton(b).toArray())
+                .collect(toList());
+    }
 
     @Before
     public void setup() {

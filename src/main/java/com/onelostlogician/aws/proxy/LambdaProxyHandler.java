@@ -58,7 +58,7 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
             String method = request.getHttpMethod();
             logger.info("Method: " + method + "\n");
 
-            if (optionsSupport) {
+            if (optionsSupport && method.toLowerCase().equals("options")) {
                 handleOptionsRequest(request, configuration);
             }
             else if (!methodHandlerMap.keySet().contains(method)) {
