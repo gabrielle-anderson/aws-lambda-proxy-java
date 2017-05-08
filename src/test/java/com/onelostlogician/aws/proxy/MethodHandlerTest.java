@@ -9,11 +9,16 @@ import org.junit.Before;
 import org.junit.Test;
 
 import javax.ws.rs.core.MediaType;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
 
-import static java.util.Arrays.asList;
+import static com.onelostlogician.aws.proxy.Util.randomiseKeyValues;
 import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.toMap;
+import static java.util.stream.Collectors.toConcurrentMap;
+import static java.util.stream.Collectors.toList;
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON_TYPE;
 import static javax.ws.rs.core.MediaType.TEXT_PLAIN_TYPE;
 import static javax.ws.rs.core.Response.Status.*;
@@ -104,15 +109,18 @@ public class MethodHandlerTest {
 
     @Test
     public void shouldReturnOkIfRequiredHeadersArePresent() throws Exception {
-        Collection<String> requiredHeaders = asList("header1", "header2");
+        Collection<String> requiredHeaders = Stream.of("header1", "header2")
+                .map(Util::randomizeCase)
+                .collect(toList());
         SampleMethodHandler sampleMethodHandlerWithRequiredHeaders = new SampleMethodHandler(requiredHeaders);
         sampleMethodHandlerWithRequiredHeaders.registerPerContentType(CONTENT_TYPE, contentTypeMapper);
         sampleMethodHandlerWithRequiredHeaders.registerPerAccept(ACCEPT, acceptMapper);
         int output = 0;
-        Map<String, String> headers = requiredHeaders.stream().collect(toMap(
+        Map<String, String> headers = requiredHeaders.stream().collect(toConcurrentMap(
                 identity(),
                 header -> RandomStringUtils.randomAlphabetic(5)
         ));
+        randomiseKeyValues(headers);
         ApiGatewayProxyRequest requestWithRequiredHeaders = new ApiGatewayProxyRequestBuilder()
                 .withContext(context)
                 .withHeaders(headers)
@@ -129,16 +137,19 @@ public class MethodHandlerTest {
 
     @Test
     public void shouldReturnBadRequestIfRequiredHeadersAreNotPresent() throws Exception {
-        List<String> requiredHeaders = asList("header1", "header2");
+        List<String> requiredHeaders = Stream.of("header1", "header2")
+                .map(Util::randomizeCase)
+                .collect(toList());
         SampleMethodHandler sampleMethodHandlerWithRequiredHeaders = new SampleMethodHandler(requiredHeaders);
         sampleMethodHandlerWithRequiredHeaders.registerPerContentType(CONTENT_TYPE, contentTypeMapper);
         sampleMethodHandlerWithRequiredHeaders.registerPerAccept(ACCEPT, acceptMapper);
         int output = 0;
         int lastElementIndex = requiredHeaders.size() - 1;
-        Map<String, String> headers = requiredHeaders.subList(0, lastElementIndex).stream().collect(toMap(
+        Map<String, String> headers = requiredHeaders.subList(0, lastElementIndex).stream().collect(toConcurrentMap(
                 identity(),
                 header -> RandomStringUtils.randomAlphabetic(5)
         ));
+        randomiseKeyValues(headers);
         ApiGatewayProxyRequest requestWithRequiredHeaders = new ApiGatewayProxyRequestBuilder()
                 .withContext(context)
                 .withHeaders(headers)
@@ -151,6 +162,6 @@ public class MethodHandlerTest {
         ApiGatewayProxyResponse response = sampleMethodHandlerWithRequiredHeaders.handle(requestWithRequiredHeaders, CONTENT_TYPE, ACCEPT, context);
 
         assertThat(response.getStatusCode()).isEqualTo(BAD_REQUEST.getStatusCode());
-        assertThat(response.getBody()).contains("The following required headers are not present: " + requiredHeaders.get(lastElementIndex));
+        assertThat(response.getBody()).contains("The following required headers are not present: " + requiredHeaders.get(lastElementIndex).toLowerCase());
     }
 }

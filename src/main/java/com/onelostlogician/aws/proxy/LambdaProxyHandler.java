@@ -18,14 +18,16 @@ import java.util.function.Function;
 
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static javax.ws.rs.core.HttpHeaders.ACCEPT;
 import static javax.ws.rs.core.HttpHeaders.CONTENT_TYPE;
 import static javax.ws.rs.core.Response.Status.*;
 
 public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Configuration>
         implements RequestHandler<ApiGatewayProxyRequest, ApiGatewayProxyResponse> {
-    public static final String ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method";
-    public static final String ACCESS_CONTROL_REQUEST_HEADERS = "Access-Control-Request-Headers";
+    private static final String ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method".toLowerCase();
+    private static final String ACCESS_CONTROL_REQUEST_HEADERS = "Access-Control-Request-Headers".toLowerCase();
     private final Logger logger = Logger.getLogger(getClass());
     private final boolean optionsSupport;
     private final Map<String, Function<MethodHandlerConfiguration, MethodHandler>> methodHandlerMap;
@@ -36,11 +38,11 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
 
     public LambdaProxyHandler(boolean withOptionsSupport, Map<String, Function<MethodHandlerConfiguration, MethodHandler>> methodHandlerMap) {
         this.optionsSupport = withOptionsSupport;
-        this.methodHandlerMap = methodHandlerMap;
+        this.methodHandlerMap = keyValuesToLowerCase(methodHandlerMap);
     }
 
     public void registerMethodHandler(String method, Function<MethodHandlerConfiguration, MethodHandler> methodHandlerConstuctor) {
-        methodHandlerMap.put(method, methodHandlerConstuctor);
+        methodHandlerMap.put(method.toLowerCase(), methodHandlerConstuctor);
     }
 
     @Override
@@ -55,7 +57,7 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
                 throw new LambdaException(getServerErrorResponse("This service is mis-configured. Please contact your system administrator.\n", e));
             }
 
-            String method = request.getHttpMethod();
+            String method = request.getHttpMethod().toLowerCase();
             logger.info("Method: " + method + "\n");
 
             if (optionsSupport && method.toLowerCase().equals("options")) {
@@ -70,17 +72,19 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
                 throw new LambdaException(wrongMethod);
             }
             MethodHandler methodHandler = getMethodHandler(configuration, method);
-            Map<String, String> headers = request.getHeaders();
+            Map<String, String> headers = keyValuesToLowerCase(request.getHeaders());
 
-            validateHeaderOrThrow(headers, CONTENT_TYPE, UNSUPPORTED_MEDIA_TYPE);
-            validateHeaderOrThrow(headers, ACCEPT, UNSUPPORTED_MEDIA_TYPE);
+            String contentTypeHeader = CONTENT_TYPE.toLowerCase();
+            validateHeaderOrThrow(headers, contentTypeHeader, UNSUPPORTED_MEDIA_TYPE);
+            String acceptHeader = ACCEPT.toLowerCase();
+            validateHeaderOrThrow(headers, acceptHeader, UNSUPPORTED_MEDIA_TYPE);
 
             MediaType contentType;
             MediaType accept;
             try {
-                String contentTypeString = requireNonNull(headers.get(CONTENT_TYPE)).toLowerCase();
+                String contentTypeString = requireNonNull(headers.get(contentTypeHeader)).toLowerCase();
                 contentType = MediaType.valueOf(contentTypeString);
-                String acceptString = requireNonNull(headers.get(ACCEPT)).toLowerCase();
+                String acceptString = requireNonNull(headers.get(acceptHeader)).toLowerCase();
                 accept = MediaType.valueOf(acceptString);
             }
             catch (IllegalArgumentException e) {
@@ -118,7 +122,7 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
             ApiGatewayProxyRequest request,
             MethodHandlerConfiguration configuration
     ) throws LambdaException {
-        Map<String, String> headers = request.getHeaders();
+        Map<String, String> headers = keyValuesToLowerCase(request.getHeaders());
         if (!headers.keySet().contains(ACCESS_CONTROL_REQUEST_METHOD)) {
             ApiGatewayProxyResponse wrongHeaders = new ApiGatewayProxyResponseBuilder()
                             .withStatusCode(BAD_REQUEST.getStatusCode())
@@ -126,7 +130,7 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
                             .build();
             throw new LambdaException(wrongHeaders);
         }
-        String methodBeingInvestigated = headers.get(ACCESS_CONTROL_REQUEST_METHOD);
+        String methodBeingInvestigated = headers.get(ACCESS_CONTROL_REQUEST_METHOD).toLowerCase();
         if (!methodHandlerMap.keySet().contains(methodBeingInvestigated)) {
             ApiGatewayProxyResponse wrongMethod = new ApiGatewayProxyResponseBuilder()
                             .withStatusCode(BAD_REQUEST.getStatusCode())
@@ -145,9 +149,11 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
             throw new LambdaException(wrongHeaders);
         }
         List<String> proposedRequestHeaders = asList(proposedRequestHeadersStr
-                .replaceAll("\\s","")
-                .split(",")
-        );
+                    .replaceAll("\\s","")
+                    .split(",")
+                ).stream()
+                .map(String::toLowerCase)
+                .collect(toList());
         if (!proposedRequestHeaders.containsAll(requiredHeaders)) {
             ApiGatewayProxyResponse wrongHeaders =
                     new ApiGatewayProxyResponseBuilder()
@@ -198,5 +204,13 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
                     .build();
             throw new LambdaException(noHeaders);
         }
+    }
+
+    private static <T> Map<String, T> keyValuesToLowerCase(Map<String, T> map) {
+        return map.entrySet().stream()
+                .collect(toMap(
+                        entry -> entry.getKey().toLowerCase(),
+                        Map.Entry::getValue
+                ));
     }
 }

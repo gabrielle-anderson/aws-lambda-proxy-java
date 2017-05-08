@@ -16,22 +16,28 @@ import org.junit.runners.Parameterized;
 
 import javax.ws.rs.core.MediaType;
 import java.io.IOException;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
+import static com.onelostlogician.aws.proxy.Util.randomiseKeyValues;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import static javax.ws.rs.core.HttpHeaders.ACCEPT;
 import static javax.ws.rs.core.HttpHeaders.CONTENT_TYPE;
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON_TYPE;
 import static javax.ws.rs.core.MediaType.TEXT_PLAIN_TYPE;
 import static javax.ws.rs.core.Response.Status.*;
 import static org.assertj.core.api.Java6Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.*;
 
 @RunWith(ParallelParameterized.class)
 public class LambdaProxyHandlerTest {
@@ -69,13 +75,13 @@ public class LambdaProxyHandlerTest {
     public void shouldReturnBadRequestIfMethodNotRegistered() throws IOException, ParseException {
         ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
                 .withHttpMethod("GET")
-                .withHeaders(new HashMap<>())
+                .withHeaders(new ConcurrentHashMap<>())
                 .withContext(context)
                 .build();
         ApiGatewayProxyResponse response = handler.handleRequest(request, context);
 
         assertThat(response.getStatusCode()).isEqualTo(BAD_REQUEST.getStatusCode());
-        assertThat(response.getBody()).isEqualTo(String.format("Lambda cannot handle the method %s", METHOD));
+        assertThat(response.getBody()).isEqualTo(String.format("Lambda cannot handle the method %s", METHOD.toLowerCase()));
     }
 
     @Test
@@ -113,7 +119,7 @@ public class LambdaProxyHandlerTest {
     public void shouldReturnUnsupportedMediaTypeIfContentTypeNotSpecified() throws IOException, ParseException {
         ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
                 .withHttpMethod(METHOD)
-                .withHeaders(new HashMap<>())
+                .withHeaders(new ConcurrentHashMap<>())
                 .withContext(context)
                 .build();
         handler.registerMethodHandler(METHOD, constructor);
@@ -121,13 +127,14 @@ public class LambdaProxyHandlerTest {
         ApiGatewayProxyResponse response = handler.handleRequest(request, context);
 
         assertThat(response.getStatusCode()).isEqualTo(UNSUPPORTED_MEDIA_TYPE.getStatusCode());
-        assertThat(response.getBody()).isEqualTo(String.format("No %s header", CONTENT_TYPE));
+        assertThat(response.getBody()).isEqualTo(String.format("No %s header", CONTENT_TYPE.toLowerCase()));
     }
 
     @Test
     public void shouldReturnUnsupportedMediaTypeIfAcceptNotSpecified() throws IOException, ParseException {
-        Map<String, String> headers = new HashMap<>();
+        Map<String, String> headers = new ConcurrentHashMap<>();
         headers.put(CONTENT_TYPE, METHOD_CONTENT_TYPE.toString());
+        randomiseKeyValues(headers);
         ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
                 .withHttpMethod(METHOD)
                 .withHeaders(headers)
@@ -138,23 +145,24 @@ public class LambdaProxyHandlerTest {
         ApiGatewayProxyResponse response = handler.handleRequest(request, context);
 
         assertThat(response.getStatusCode()).isEqualTo(UNSUPPORTED_MEDIA_TYPE.getStatusCode());
-        assertThat(response.getBody()).isEqualTo(String.format("No %s header", ACCEPT));
+        assertThat(response.getBody()).isEqualTo(String.format("No %s header", ACCEPT.toLowerCase()));
     }
 
     @Test
     public void shouldReturnBadRequestForMalformedMediaTypes() throws Exception {
         String someHeader = "someHeader";
         String someValue = "someValue";
-        Map<String, String> requestHeaders = new HashMap<>();
+        Map<String, String> requestHeaders = new ConcurrentHashMap<>();
         requestHeaders.put(CONTENT_TYPE, "vnd.ms-excel");
         requestHeaders.put(ACCEPT, METHOD_ACCEPT.toString());
         requestHeaders.put(someHeader, someValue);
+        randomiseKeyValues(requestHeaders);
         ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
                 .withHttpMethod(METHOD)
                 .withHeaders(requestHeaders)
                 .withContext(context)
                 .build();
-        HashMap<String, String> responseHeaders = new HashMap<>();
+        Map<String, String> responseHeaders = new ConcurrentHashMap<>();
         responseHeaders.put(someHeader, someValue);
         when(methodHandler.handle(request, METHOD_CONTENT_TYPE, METHOD_ACCEPT, context))
                 .thenReturn(
@@ -176,7 +184,7 @@ public class LambdaProxyHandlerTest {
     public void shouldReturnResponseFromMethodHandler() throws Exception {
         String someHeader = "someHeader";
         String someValue = "someValue";
-        Map<String, String> requestHeaders = new HashMap<>();
+        Map<String, String> requestHeaders = new ConcurrentHashMap<>();
         requestHeaders.put(CONTENT_TYPE, METHOD_CONTENT_TYPE.toString());
         requestHeaders.put(ACCEPT, METHOD_ACCEPT.toString());
         requestHeaders.put(someHeader, someValue);
@@ -185,7 +193,7 @@ public class LambdaProxyHandlerTest {
                 .withHeaders(requestHeaders)
                 .withContext(context)
                 .build();
-        HashMap<String, String> responseHeaders = new HashMap<>();
+        Map<String, String> responseHeaders = new ConcurrentHashMap<>();
         responseHeaders.put(someHeader, someValue);
         when(methodHandler.handle(request, METHOD_CONTENT_TYPE, METHOD_ACCEPT, context))
                 .thenReturn(new ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder()
@@ -206,7 +214,7 @@ public class LambdaProxyHandlerTest {
     public void shouldReturnResponseFromMethodHandlerWithDifferentlyCasedContentTypeAndAccept() throws Exception {
         String someHeader = "someHeader";
         String someValue = "someValue";
-        Map<String, String> requestHeaders = new HashMap<>();
+        Map<String, String> requestHeaders = new ConcurrentHashMap<>();
         requestHeaders.put(CONTENT_TYPE, METHOD_CONTENT_TYPE.toString().toUpperCase());
         requestHeaders.put(ACCEPT, METHOD_ACCEPT.toString().toUpperCase());
         requestHeaders.put(someHeader, someValue);
@@ -215,7 +223,7 @@ public class LambdaProxyHandlerTest {
                 .withHeaders(requestHeaders)
                 .withContext(context)
                 .build();
-        HashMap<String, String> responseHeaders = new HashMap<>();
+        Map<String, String> responseHeaders = new ConcurrentHashMap<>();
         responseHeaders.put(someHeader, someValue);
         when(methodHandler.handle(request, METHOD_CONTENT_TYPE, METHOD_ACCEPT, context))
                 .thenReturn(new ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder()
@@ -234,9 +242,10 @@ public class LambdaProxyHandlerTest {
 
     @Test
     public void shouldPassThroughErrorMessageFromMethodHandlerInvocationIfDebug() throws Exception {
-        Map<String, String> headers = new HashMap<>();
+        Map<String, String> headers = new ConcurrentHashMap<>();
         headers.put(CONTENT_TYPE, METHOD_CONTENT_TYPE.toString());
         headers.put(ACCEPT, METHOD_ACCEPT.toString());
+        randomiseKeyValues(headers);
         ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
                 .withHttpMethod(METHOD)
                 .withHeaders(headers)
@@ -281,7 +290,9 @@ public class LambdaProxyHandlerTest {
         MediaType mediaType2 = new MediaType("application", "type2");
         MediaType mediaType3 = new MediaType("application", "type3");
         MediaType mediaType4 = new MediaType("application", "type4");
-        Collection<String> requiredHeaders = asList("header1", "header2");
+        Collection<String> requiredHeaders = Stream.of("header1", "header2")
+                .map(Util::randomizeCase)
+                .collect(toList());
         SampleMethodHandler sampleMethodHandler = new SampleMethodHandler(requiredHeaders);
         sampleMethodHandler.registerPerAccept(mediaType1, mock(AcceptMapper.class));
         sampleMethodHandler.registerPerAccept(mediaType2, mock(AcceptMapper.class));
@@ -291,13 +302,15 @@ public class LambdaProxyHandlerTest {
                 method,
                 c -> sampleMethodHandler
         ));
-        Map<String, String> headers = new HashMap<>();
+        Map<String, String> headers = new ConcurrentHashMap<>();
         headers.put("Access-Control-Request-Method", methodBeingInvestigated);
-        Collection<String> requestHeaders = new HashSet<>(requiredHeaders);
+        Collection<String> requestHeaders = requiredHeaders.stream()
+                .map(Util::randomizeCase)
+                .collect(toSet());
         requestHeaders.add("header3");
         headers.put("Access-Control-Request-Headers", String.join(", ", requestHeaders));
-
         headers.put("Content-Type", mediaType4.toString());
+        randomiseKeyValues(headers);
         ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
                 .withHttpMethod("OPTIONS")
                 .withHeaders(headers)
@@ -317,7 +330,9 @@ public class LambdaProxyHandlerTest {
         MediaType mediaType2 = new MediaType("application", "type2");
         MediaType mediaType3 = new MediaType("application", "type3");
         MediaType mediaType4 = new MediaType("application", "type4");
-        Collection<String> requiredHeaders = asList("header1", "header2");
+        Collection<String> requiredHeaders = Stream.of("header1", "header2")
+                .map(Util::randomizeCase)
+                .collect(toList());
         SampleMethodHandler sampleMethodHandler = new SampleMethodHandler(requiredHeaders);
         sampleMethodHandler.registerPerAccept(mediaType1, mock(AcceptMapper.class));
         sampleMethodHandler.registerPerAccept(mediaType2, mock(AcceptMapper.class));
@@ -327,12 +342,14 @@ public class LambdaProxyHandlerTest {
                 method,
                 c -> sampleMethodHandler
         ));
-        Map<String, String> headers = new HashMap<>();
-        Collection<String> requestHeaders = new HashSet<>(requiredHeaders);
+        Map<String, String> headers = new ConcurrentHashMap<>();
+        Collection<String> requestHeaders = requiredHeaders.stream()
+                .map(Util::randomizeCase)
+                .collect(toSet());
         requestHeaders.add("header3");
         headers.put(ACCESS_CONTROL_REQUEST_HEADERS, String.join(", ", requestHeaders));
-
         headers.put("Content-Type", mediaType4.toString());
+        randomiseKeyValues(headers);
         ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
                 .withHttpMethod("OPTIONS")
                 .withHeaders(headers)
@@ -342,7 +359,7 @@ public class LambdaProxyHandlerTest {
         ApiGatewayProxyResponse response = handlerWithOptionsSupport.handleRequest(request, context);
 
         assertThat(response.getStatusCode()).isEqualTo(BAD_REQUEST.getStatusCode());
-        assertThat(response.getBody()).contains(String.format("Options method should include the %s header", ACCESS_CONTROL_REQUEST_METHOD));
+        assertThat(response.getBody()).contains(String.format("Options method should include the %s header", ACCESS_CONTROL_REQUEST_METHOD.toLowerCase()));
     }
 
     @Test
@@ -354,7 +371,9 @@ public class LambdaProxyHandlerTest {
         MediaType mediaType2 = new MediaType("application", "type2");
         MediaType mediaType3 = new MediaType("application", "type3");
         MediaType mediaType4 = new MediaType("application", "type4");
-        Collection<String> requiredHeaders = asList("header1", "header2");
+        Collection<String> requiredHeaders = Stream.of("header1", "header2")
+                .map(Util::randomizeCase)
+                .collect(toList());
         SampleMethodHandler sampleMethodHandler = new SampleMethodHandler(requiredHeaders);
         sampleMethodHandler.registerPerAccept(mediaType1, mock(AcceptMapper.class));
         sampleMethodHandler.registerPerAccept(mediaType2, mock(AcceptMapper.class));
@@ -364,13 +383,13 @@ public class LambdaProxyHandlerTest {
                 method,
                 c -> sampleMethodHandler
         ));
-        Map<String, String> headers = new HashMap<>();
+        Map<String, String> headers = new ConcurrentHashMap<>();
         headers.put(ACCESS_CONTROL_REQUEST_METHOD, methodBeingInvestigated);
         Collection<String> requestHeaders = new HashSet<>(requiredHeaders);
         requestHeaders.add("header3");
         headers.put(ACCESS_CONTROL_REQUEST_HEADERS, String.join(", ", requestHeaders));
-
         headers.put("Content-Type", mediaType4.toString());
+        randomiseKeyValues(headers);
         ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
                 .withHttpMethod("OPTIONS")
                 .withHeaders(headers)
@@ -380,7 +399,7 @@ public class LambdaProxyHandlerTest {
         ApiGatewayProxyResponse response = handlerWithOptionsSupport.handleRequest(request, context);
 
         assertThat(response.getStatusCode()).isEqualTo(BAD_REQUEST.getStatusCode());
-        assertThat(response.getBody()).isEqualTo(String.format("Lambda cannot handle the method %s", methodBeingInvestigated));
+        assertThat(response.getBody()).isEqualTo(String.format("Lambda cannot handle the method %s", methodBeingInvestigated.toLowerCase()));
     }
 
     @Test
@@ -392,7 +411,9 @@ public class LambdaProxyHandlerTest {
         MediaType mediaType2 = new MediaType("application", "type2");
         MediaType mediaType3 = new MediaType("application", "type3");
         MediaType mediaType4 = new MediaType("application", "type4");
-        List<String> requiredHeaders = asList("header1", "header2");
+        List<String> requiredHeaders = Stream.of("header1", "header2")
+                .map(Util::randomizeCase)
+                .collect(toList());
         SampleMethodHandler sampleMethodHandler = new SampleMethodHandler(requiredHeaders);
         sampleMethodHandler.registerPerAccept(mediaType1, mock(AcceptMapper.class));
         sampleMethodHandler.registerPerAccept(mediaType2, mock(AcceptMapper.class));
@@ -402,11 +423,11 @@ public class LambdaProxyHandlerTest {
                 method,
                 c -> sampleMethodHandler
         ));
-        Map<String, String> headers = new HashMap<>();
+        Map<String, String> headers = new ConcurrentHashMap<>();
         headers.put(ACCESS_CONTROL_REQUEST_METHOD, methodBeingInvestigated);
         headers.put(ACCESS_CONTROL_REQUEST_HEADERS, "");
-
         headers.put("Content-Type", mediaType4.toString());
+        randomiseKeyValues(headers);
         ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
                 .withHttpMethod("OPTIONS")
                 .withHeaders(headers)
@@ -416,7 +437,34 @@ public class LambdaProxyHandlerTest {
         ApiGatewayProxyResponse response = handlerWithOptionsSupport.handleRequest(request, context);
 
         assertThat(response.getStatusCode()).isEqualTo(BAD_REQUEST.getStatusCode());
-        assertThat(response.getBody()).contains(String.format("The required header(s) not present: %s", String.join(", ", requiredHeaders)));
+        assertThat(response.getBody()).contains(String.format("The required header(s) not present: %s", String.join(", ", requiredHeaders.stream().map(String::toLowerCase).collect(toList()))));
+    }
+
+    @Test
+    public void mediaTypesAreCreatedWithLowerCaseValues() throws Exception {
+        String someHeader = "someHeader";
+        String someValue = "someValue";
+        Map<String, String> requestHeaders = new ConcurrentHashMap<>();
+        requestHeaders.put(CONTENT_TYPE, METHOD_CONTENT_TYPE.toString());
+        requestHeaders.put(ACCEPT, METHOD_ACCEPT.toString());
+        requestHeaders.put(someHeader, someValue);
+        ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
+                .withHttpMethod(METHOD)
+                .withHeaders(requestHeaders)
+                .withContext(context)
+                .build();
+        Map<String, String> responseHeaders = new ConcurrentHashMap<>();
+        responseHeaders.put(someHeader, someValue);
+        when(methodHandler.handle(request, METHOD_CONTENT_TYPE, METHOD_ACCEPT, context))
+                .thenReturn(new ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder()
+                        .withStatusCode(OK.getStatusCode())
+                        .withHeaders(responseHeaders)
+                        .build());
+        handler.registerMethodHandler(METHOD, constructor);
+
+        handler.handleRequest(request, context);
+
+        verify(methodHandler).handle(any(), eq(METHOD_CONTENT_TYPE), eq(METHOD_ACCEPT), any());
     }
 
     private class TestLambdaProxyHandler extends LambdaProxyHandler<Configuration> {

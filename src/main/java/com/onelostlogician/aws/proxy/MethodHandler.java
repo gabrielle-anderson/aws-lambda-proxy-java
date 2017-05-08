@@ -12,6 +12,8 @@ import java.util.function.Function;
 
 import static com.onelostlogician.aws.proxy.ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 import static javax.ws.rs.core.Response.Status.BAD_REQUEST;
 import static javax.ws.rs.core.Response.Status.UNSUPPORTED_MEDIA_TYPE;
 
@@ -29,7 +31,9 @@ public abstract class MethodHandler<Input, Output> {
         this.perAcceptMap = new HashMap<>();
         this.exceptionMap = new HashMap<>();
         this.exceptionMap.put(LambdaException.class, (Function<LambdaException, ApiGatewayProxyResponse>) LambdaException::getResponse);
-        this.requiredHeaders = requiredHeaders;
+        this.requiredHeaders = requiredHeaders.stream()
+                .map(String::toLowerCase)
+                .collect(toList());
     }
 
     protected MethodHandler() {
@@ -67,9 +71,14 @@ public abstract class MethodHandler<Input, Output> {
                         .build();
                 throw new LambdaException(unsupportedContentType);
             }
-            if (!request.getHeaders().keySet().containsAll(requiredHeaders)) {
+            Map<String, String> headers = request.getHeaders().entrySet().stream()
+                    .collect(toMap(
+                            entry -> entry.getKey().toLowerCase(),
+                            entry -> entry.getValue().toLowerCase()
+                    ));
+            if (!headers.keySet().containsAll(requiredHeaders)) {
                 Collection<String> missingHeaders = new HashSet<>(requiredHeaders);
-                missingHeaders.removeAll(request.getHeaders().keySet());
+                missingHeaders.removeAll(headers.keySet());
                 ApiGatewayProxyResponse missingRequiredHeaders =
                         new ApiGatewayProxyResponseBuilder()
                                 .withStatusCode(BAD_REQUEST.getStatusCode())
