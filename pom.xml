@@ -6,7 +6,7 @@
 
     <groupId>com.github.gabrielle-anderson</groupId>
     <artifactId>aws-lambda-proxy-java</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
     <packaging>jar</packaging>
     <developers>
         <developer>
@@ -124,7 +124,7 @@
                 <configuration>
                     <serverId>ossrh</serverId>
                     <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                    <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                    <skipStagingRepositoryClose>true</skipStagingRepositoryClose>
                 </configuration>
             </plugin>
             <plugin>
