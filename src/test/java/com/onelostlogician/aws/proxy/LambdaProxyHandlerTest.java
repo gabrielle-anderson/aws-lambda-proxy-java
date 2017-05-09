@@ -320,6 +320,14 @@ public class LambdaProxyHandlerTest {
         ApiGatewayProxyResponse response = handlerWithOptionsSupport.handleRequest(request, context);
 
         assertThat(response.getStatusCode()).isEqualTo(OK.getStatusCode());
+        Map<String, String> responseHeaders = response.getHeaders();
+        assertThat(responseHeaders).containsKey("Access-Control-Allow-Origin");
+        assertThat(responseHeaders.get("Access-Control-Allow-Origin")).isEqualTo("*");
+        assertThat(responseHeaders).containsKey("Access-Control-Allow-Headers");
+        assertThat(asList(responseHeaders.get("Access-Control-Allow-Headers").split(", ")))
+                .containsAll(requestHeaders.stream().map(String::toLowerCase).collect(toList()));
+        assertThat(responseHeaders).containsKey("Access-Control-Allow-Methods");
+        assertThat(asList(responseHeaders.get("Access-Control-Allow-Methods").split(", "))).containsAll(supportedMethods.stream().map(String::toLowerCase).collect(toList()));
     }
 
     @Test

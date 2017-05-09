@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
@@ -163,9 +164,14 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
             throw new LambdaException(wrongHeaders);
         }
 
+        Map<String, String> responseHeaders = new HashMap<>();
+        responseHeaders.put("Access-Control-Allow-Origin", "*");
+        responseHeaders.put("Access-Control-Allow-Headers", proposedRequestHeaders.stream().collect(Collectors.joining(", ")));
+        responseHeaders.put("Access-Control-Allow-Methods", methodHandlerMap.keySet().stream().collect(Collectors.joining(", ")));
         ApiGatewayProxyResponse optionsOk =
                 new ApiGatewayProxyResponseBuilder()
                         .withStatusCode(OK.getStatusCode())
+                        .withHeaders(responseHeaders)
                         .build();
         throw new LambdaException(optionsOk);
     }
