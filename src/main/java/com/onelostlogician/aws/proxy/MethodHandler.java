@@ -51,13 +51,13 @@ public abstract class MethodHandler<Input, Output> {
 
     public abstract Output handle(Input input) throws Exception;
 
-    public ApiGatewayProxyResponse handle(ApiGatewayProxyRequest request, List<MediaType> contentTypes, List<MediaType> acceptTypes, Context context) throws Exception {
+    public ApiGatewayProxyResponse handle(ApiGatewayProxyRequest request, List<ParameterisedMediaType> contentTypes, List<ParameterisedMediaType> acceptTypes, Context context) throws Exception {
         ApiGatewayProxyResponse response;
         try {
-            ContentTypeMapper<Input> contentTypeMapper = getMapper(contentTypes, perContentTypeMap, "Content-Types %s are not supported");
+            ContentTypeMapper<Input> contentTypeMapper = getMapper(getMediaTypes(contentTypes), perContentTypeMap, "Content-Types %s are not supported");
             logger.debug("Content-Type mapper found.");
 
-            AcceptMapper<Output> acceptMapper = getMapper(acceptTypes, perAcceptMap, "Accept types %s are not supported");
+            AcceptMapper<Output> acceptMapper = getMapper(getMediaTypes(acceptTypes), perAcceptMap, "Accept types %s are not supported");
             logger.debug("Accept mapper found.");
 
             Map<String, String> headers = request.getHeaders().entrySet().stream()
@@ -90,6 +90,10 @@ public abstract class MethodHandler<Input, Output> {
         }
 
         return response;
+    }
+
+    private List<MediaType> getMediaTypes(List<ParameterisedMediaType> contentTypes) {
+        return contentTypes.stream().map(ParameterisedMediaType::getMediaType).collect(toList());
     }
 
     private static <T> T getMapper(List<MediaType> contentTypes, Map<MediaType, T> contentTypeMap, String errorMessage) throws LambdaException {

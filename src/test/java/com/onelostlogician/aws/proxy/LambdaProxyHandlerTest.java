@@ -16,10 +16,7 @@ import org.junit.runners.Parameterized;
 
 import javax.ws.rs.core.MediaType;
 import java.io.IOException;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
@@ -27,8 +24,7 @@ import static com.onelostlogician.aws.proxy.Util.randomiseKeyValues;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
-import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toSet;
+import static java.util.stream.Collectors.*;
 import static javax.ws.rs.core.HttpHeaders.ACCEPT;
 import static javax.ws.rs.core.HttpHeaders.CONTENT_TYPE;
 import static javax.ws.rs.core.Response.Status.*;
@@ -184,7 +180,7 @@ public class LambdaProxyHandlerTest {
                 .build();
         Map<String, String> responseHeaders = new ConcurrentHashMap<>();
         responseHeaders.put(someHeader, someValue);
-        when(methodHandler.handle(request, singletonList(CONTENT_TYPE_1), singletonList(ACCEPT_TYPE_1), context))
+        when(methodHandler.handle(request, singletonList(new ParameterisedMediaType(CONTENT_TYPE_1, new HashMap<>())), singletonList(new ParameterisedMediaType(ACCEPT_TYPE_1, new HashMap<>())), context))
                 .thenReturn(new ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder()
                         .withStatusCode(OK.getStatusCode())
                         .withHeaders(responseHeaders)
@@ -214,7 +210,9 @@ public class LambdaProxyHandlerTest {
                 .build();
         Map<String, String> responseHeaders = new ConcurrentHashMap<>();
         responseHeaders.put(someHeader, someValue);
-        when(methodHandler.handle(request, asList(CONTENT_TYPE_1, CONTENT_TYPE_2), asList(ACCEPT_TYPE_1, ACCEPT_TYPE_2), context))
+        List<ParameterisedMediaType> contentTypes = asList(new ParameterisedMediaType(CONTENT_TYPE_1, new HashMap<>()), new ParameterisedMediaType(CONTENT_TYPE_2, new HashMap<>()));
+        List<ParameterisedMediaType> acceptTypes = asList(new ParameterisedMediaType(ACCEPT_TYPE_1, new HashMap<>()), new ParameterisedMediaType(ACCEPT_TYPE_2, new HashMap<>()));
+        when(methodHandler.handle(eq(request), eq(contentTypes), eq(acceptTypes), eq(context)))
                 .thenReturn(new ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder()
                         .withStatusCode(OK.getStatusCode())
                         .withHeaders(responseHeaders)
@@ -223,15 +221,21 @@ public class LambdaProxyHandlerTest {
 
         handler.handleRequest(request, context);
 
-        verify(methodHandler).handle(request, asList(CONTENT_TYPE_1, CONTENT_TYPE_2), asList(ACCEPT_TYPE_1, ACCEPT_TYPE_2), context);
+        verify(methodHandler).handle(request, contentTypes, acceptTypes, context);
     }
 
     @Test
-    public void shouldIgnoreContentTypeParameters() throws Exception {
+    public void shouldMapContentTypeParameters() throws Exception {
         String someHeader = "someHeader";
         String someValue = "someValue";
         Map<String, String> requestHeaders = new ConcurrentHashMap<>();
-        requestHeaders.put(CONTENT_TYPE, CONTENT_TYPE_1.toString() + ";q=0.9;b=hello" + ", " + CONTENT_TYPE_2.toString());
+        Map<String, String> mediaTypeParameters = new HashMap<>();
+        mediaTypeParameters.put("q", "0.9");
+        mediaTypeParameters.put("b", "hello");
+        String mediaTypeParametersString = mediaTypeParameters.entrySet().stream()
+                .map(entry -> ";" + entry.getKey() + "=" + entry.getValue())
+                .collect(joining(""));
+        requestHeaders.put(CONTENT_TYPE, CONTENT_TYPE_1.toString() + mediaTypeParametersString + ", " + CONTENT_TYPE_2.toString());
         requestHeaders.put(ACCEPT, ACCEPT_TYPE_1.toString() + ", " + ACCEPT_TYPE_2.toString());
         requestHeaders.put(someHeader, someValue);
         ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
@@ -241,16 +245,19 @@ public class LambdaProxyHandlerTest {
                 .build();
         Map<String, String> responseHeaders = new ConcurrentHashMap<>();
         responseHeaders.put(someHeader, someValue);
-        when(methodHandler.handle(request, asList(CONTENT_TYPE_1, CONTENT_TYPE_2), asList(ACCEPT_TYPE_1, ACCEPT_TYPE_2), context))
-                .thenReturn(new ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder()
-                        .withStatusCode(OK.getStatusCode())
-                        .withHeaders(responseHeaders)
-                        .build());
+        List<ParameterisedMediaType> contentTypes = asList(new ParameterisedMediaType(CONTENT_TYPE_1, mediaTypeParameters), new ParameterisedMediaType(CONTENT_TYPE_2, new HashMap<>()));
+        List<ParameterisedMediaType> acceptTypes = asList(new ParameterisedMediaType(ACCEPT_TYPE_1, new HashMap<>()), new ParameterisedMediaType(ACCEPT_TYPE_2, new HashMap<>()));
+        when(methodHandler.handle(request, contentTypes, acceptTypes, context)
+        )
+        .thenReturn(new ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder()
+                .withStatusCode(OK.getStatusCode())
+                .withHeaders(responseHeaders)
+                .build());
         handler.registerMethodHandler(METHOD, c -> methodHandler);
 
         handler.handleRequest(request, context);
 
-        verify(methodHandler).handle(request, asList(CONTENT_TYPE_1, CONTENT_TYPE_2), asList(ACCEPT_TYPE_1, ACCEPT_TYPE_2), context);
+        verify(methodHandler).handle(request, contentTypes, acceptTypes, context);
     }
 
     @Test
@@ -268,7 +275,7 @@ public class LambdaProxyHandlerTest {
                 .build();
         Map<String, String> responseHeaders = new ConcurrentHashMap<>();
         responseHeaders.put(someHeader, someValue);
-        when(methodHandler.handle(request, singletonList(CONTENT_TYPE_1), singletonList(ACCEPT_TYPE_1), context))
+        when(methodHandler.handle(request, singletonList(new ParameterisedMediaType(CONTENT_TYPE_1, new HashMap<>())), singletonList(new ParameterisedMediaType(ACCEPT_TYPE_1, new HashMap<>())), context))
                 .thenReturn(new ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder()
                         .withStatusCode(OK.getStatusCode())
                         .withHeaders(responseHeaders)
@@ -308,7 +315,7 @@ public class LambdaProxyHandlerTest {
         int lineNumber2 = 2;
         expectedStackTrace[1] = new StackTraceElement(declaringClass2, methodName2, fileName2, lineNumber2);
         cause.setStackTrace(expectedStackTrace);
-        when(methodHandler.handle(request, singletonList(CONTENT_TYPE_1), singletonList(ACCEPT_TYPE_1), context))
+        when(methodHandler.handle(request, singletonList(new ParameterisedMediaType(CONTENT_TYPE_1, new HashMap<>())), singletonList(new ParameterisedMediaType(ACCEPT_TYPE_1, new HashMap<>())), context))
                 .thenThrow(new RuntimeException(message, cause));
         handler.registerMethodHandler(METHOD, c -> methodHandler);
 
@@ -506,7 +513,7 @@ public class LambdaProxyHandlerTest {
                 .build();
         Map<String, String> responseHeaders = new ConcurrentHashMap<>();
         responseHeaders.put(someHeader, someValue);
-        when(methodHandler.handle(request, singletonList(CONTENT_TYPE_1), singletonList(ACCEPT_TYPE_1), context))
+        when(methodHandler.handle(request, singletonList(new ParameterisedMediaType(CONTENT_TYPE_1, new HashMap<>())), singletonList(new ParameterisedMediaType(ACCEPT_TYPE_1, new HashMap<>())), context))
                 .thenReturn(new ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder()
                         .withStatusCode(OK.getStatusCode())
                         .withHeaders(responseHeaders)
@@ -515,7 +522,7 @@ public class LambdaProxyHandlerTest {
 
         handler.handleRequest(request, context);
 
-        verify(methodHandler).handle(any(), eq(singletonList(CONTENT_TYPE_1)), eq(singletonList(ACCEPT_TYPE_1)), any());
+        verify(methodHandler).handle(any(), eq(singletonList(new ParameterisedMediaType(CONTENT_TYPE_1, new HashMap<>()))), eq(singletonList(new ParameterisedMediaType(ACCEPT_TYPE_1, new HashMap<>()))), any());
     }
 
     private class TestLambdaProxyHandler extends LambdaProxyHandler<Configuration> {
