@@ -4,10 +4,7 @@ import com.amazonaws.services.lambda.runtime.Context;
 import org.apache.log4j.Logger;
 
 import javax.ws.rs.core.MediaType;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 
 import static com.onelostlogician.aws.proxy.ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder;
@@ -54,23 +51,15 @@ public abstract class MethodHandler<Input, Output> {
 
     public abstract Output handle(Input input) throws Exception;
 
-    public ApiGatewayProxyResponse handle(ApiGatewayProxyRequest request, MediaType contentType, MediaType accept, Context context) throws Exception {
+    public ApiGatewayProxyResponse handle(ApiGatewayProxyRequest request, List<MediaType> contentTypes, List<MediaType> acceptTypes, Context context) throws Exception {
         ApiGatewayProxyResponse response;
         try {
-            if (!perContentTypeMap.containsKey(contentType)) {
-                ApiGatewayProxyResponse unsupportedContentType = new ApiGatewayProxyResponseBuilder()
-                                .withStatusCode(UNSUPPORTED_MEDIA_TYPE.getStatusCode())
-                                .withBody(String.format("Content-Type %s is not supported", contentType))
-                                .build();
-                throw new LambdaException(unsupportedContentType);
-            }
-            if (!perAcceptMap.containsKey(accept)) {
-                ApiGatewayProxyResponse unsupportedContentType = new ApiGatewayProxyResponseBuilder()
-                        .withStatusCode(UNSUPPORTED_MEDIA_TYPE.getStatusCode())
-                        .withBody(String.format("Accept %s is not supported", accept))
-                        .build();
-                throw new LambdaException(unsupportedContentType);
-            }
+            ContentTypeMapper<Input> contentTypeMapper = getMapper(contentTypes, perContentTypeMap, "Content-Types %s are not supported");
+            logger.debug("Content-Type mapper found.");
+
+            AcceptMapper<Output> acceptMapper = getMapper(acceptTypes, perAcceptMap, "Accept types %s are not supported");
+            logger.debug("Accept mapper found.");
+
             Map<String, String> headers = request.getHeaders().entrySet().stream()
                     .collect(toMap(
                             entry -> entry.getKey().toLowerCase(),
@@ -88,10 +77,6 @@ public abstract class MethodHandler<Input, Output> {
                 throw new LambdaException(missingRequiredHeaders);
             }
 
-            ContentTypeMapper<Input> contentTypeMapper = perContentTypeMap.get(contentType);
-            logger.debug("Content-Type mapper found.");
-            AcceptMapper<Output> acceptMapper = perAcceptMap.get(accept);
-            logger.debug("Accept mapper found.");
 
             logger.debug(String.format("Mapping input (%s): %s", contentTypeMapper.getClass(), request));
             Input input = requireNonNull(contentTypeMapper.toInput(request, context));
@@ -105,6 +90,22 @@ public abstract class MethodHandler<Input, Output> {
         }
 
         return response;
+    }
+
+    private static <T> T getMapper(List<MediaType> contentTypes, Map<MediaType, T> contentTypeMap, String errorMessage) throws LambdaException {
+        Optional<Map.Entry<MediaType, T>> maybeMapper = contentTypeMap.entrySet().stream()
+                .filter(entry -> contentTypes.contains(entry.getKey()))
+                .findFirst();
+        if (!maybeMapper.isPresent()) {
+            ApiGatewayProxyResponse unsupportedContentType = new ApiGatewayProxyResponseBuilder()
+                    .withStatusCode(UNSUPPORTED_MEDIA_TYPE.getStatusCode())
+                    .withBody(String.format(errorMessage, contentTypes))
+                    .build();
+            throw new LambdaException(unsupportedContentType);
+        }
+        else {
+            return maybeMapper.get().getValue();
+        }
     }
 
     public Collection<String> getRequiredHeaders() {

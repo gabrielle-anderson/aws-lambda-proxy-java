@@ -10,12 +10,10 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response.Status;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
@@ -29,6 +27,8 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
         implements RequestHandler<ApiGatewayProxyRequest, ApiGatewayProxyResponse> {
     private static final String ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method".toLowerCase();
     private static final String ACCESS_CONTROL_REQUEST_HEADERS = "Access-Control-Request-Headers".toLowerCase();
+    private static final String MEDIA_TYPE_PARAMETER_SEPARATOR = ";";
+    private static final String MEDIA_TYPE_LIST_SEPARATOR = ",";
     private final Logger logger = Logger.getLogger(getClass());
     private final boolean corsSupport;
     private final Map<String, Function<MethodHandlerConfiguration, MethodHandler>> methodHandlerMap;
@@ -80,13 +80,13 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
             String acceptHeader = ACCEPT.toLowerCase();
             validateHeaderOrThrow(headers, acceptHeader, UNSUPPORTED_MEDIA_TYPE);
 
-            MediaType contentType;
-            MediaType accept;
+            List<MediaType> contentTypes;
+            List<MediaType> acceptTypes;
             try {
                 String contentTypeString = requireNonNull(headers.get(contentTypeHeader)).toLowerCase();
-                contentType = MediaType.valueOf(contentTypeString);
+                contentTypes = getContentTypes(contentTypeString);
                 String acceptString = requireNonNull(headers.get(acceptHeader)).toLowerCase();
-                accept = MediaType.valueOf(acceptString);
+                acceptTypes = getContentTypes(acceptString);
             }
             catch (IllegalArgumentException e) {
                 ApiGatewayProxyResponse malformedMediaType =
@@ -97,10 +97,10 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
                 throw new LambdaException(malformedMediaType);
             }
 
-            logger.info("Content-Type: " + contentType + "\n");
-            logger.info("Accept: " + accept + "\n");
+            logger.info("Content-Type: " + contentTypes + "\n");
+            logger.info("Accept: " + acceptTypes + "\n");
 
-            response = methodHandler.handle(request, contentType, accept, context);
+            response = methodHandler.handle(request, contentTypes, acceptTypes, context);
         }
         catch (Error e) {
             response = new ApiGatewayProxyResponseBuilder()
@@ -117,6 +117,21 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
 
         logger.info(String.format("Completed response: %s with size %s.\n", response.getStatusCode(), response.getBody().length()));
         return response;
+    }
+
+    private List<MediaType> getContentTypes(String contentTypeString) {
+        return Stream.of(contentTypeString.split(MEDIA_TYPE_LIST_SEPARATOR))
+                .filter(Objects::nonNull)
+                .map(mediaTypeString -> {
+                    if (mediaTypeString.contains(MEDIA_TYPE_PARAMETER_SEPARATOR)) {
+                        return mediaTypeString.substring(0, mediaTypeString.indexOf(MEDIA_TYPE_PARAMETER_SEPARATOR));
+                    }
+                    else {
+                        return mediaTypeString;
+                    }
+                })
+                .map(MediaType::valueOf)
+                .collect(toList());
     }
 
     private void handleCORSRequest(
