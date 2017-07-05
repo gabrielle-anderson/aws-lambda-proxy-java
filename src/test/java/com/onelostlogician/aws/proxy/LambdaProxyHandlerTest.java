@@ -55,8 +55,8 @@ public class LambdaProxyHandlerTest {
     private MethodHandler methodHandler = mock(MethodHandler.class);
     private Function<Configuration, MethodHandler> constructor = c -> methodHandler;
 
-    public LambdaProxyHandlerTest(boolean optionsSupport) {
-        handler = new TestLambdaProxyHandler(optionsSupport);
+    public LambdaProxyHandlerTest(boolean corsSupport) {
+        handler = new TestLambdaProxyHandler(corsSupport);
     }
 
     @Parameterized.Parameters
@@ -282,8 +282,8 @@ public class LambdaProxyHandlerTest {
     }
 
     @Test
-    public void optionsSupportShouldReturnOkForRegisteredMethodAndMediaTypes() {
-        LambdaProxyHandler<Configuration> handlerWithOptionsSupport = new TestLambdaProxyHandler(true);
+    public void corsSupportShouldReturnOkForRegisteredMethodAndMediaTypes() {
+        LambdaProxyHandler<Configuration> handlerWithCORSSupport = new TestLambdaProxyHandler(true);
         String methodBeingInvestigated = "GET";
         Collection<String> supportedMethods = asList(methodBeingInvestigated, "POST");
         MediaType mediaType1 = new MediaType("application", "type1");
@@ -298,7 +298,7 @@ public class LambdaProxyHandlerTest {
         sampleMethodHandler.registerPerAccept(mediaType2, mock(AcceptMapper.class));
         sampleMethodHandler.registerPerAccept(mediaType3, mock(AcceptMapper.class));
         sampleMethodHandler.registerPerContentType(mediaType4, mock(ContentTypeMapper.class));
-        supportedMethods.forEach(method -> handlerWithOptionsSupport.registerMethodHandler(
+        supportedMethods.forEach(method -> handlerWithCORSSupport.registerMethodHandler(
                 method,
                 c -> sampleMethodHandler
         ));
@@ -317,7 +317,7 @@ public class LambdaProxyHandlerTest {
                 .withContext(context)
                 .build();
 
-        ApiGatewayProxyResponse response = handlerWithOptionsSupport.handleRequest(request, context);
+        ApiGatewayProxyResponse response = handlerWithCORSSupport.handleRequest(request, context);
 
         assertThat(response.getStatusCode()).isEqualTo(OK.getStatusCode());
         Map<String, String> responseHeaders = response.getHeaders();
@@ -331,8 +331,8 @@ public class LambdaProxyHandlerTest {
     }
 
     @Test
-    public void optionsSupportShouldReturnBadRequestWhenRequestDoesNotSpecifyMethod() {
-        LambdaProxyHandler<Configuration> handlerWithOptionsSupport = new TestLambdaProxyHandler(true);
+    public void corsSupportShouldReturnBadRequestWhenRequestDoesNotSpecifyMethod() {
+        LambdaProxyHandler<Configuration> handlerWithCorsSupport = new TestLambdaProxyHandler(true);
         Collection<String> supportedMethods = singletonList("POST");
         MediaType mediaType1 = new MediaType("application", "type1");
         MediaType mediaType2 = new MediaType("application", "type2");
@@ -346,7 +346,7 @@ public class LambdaProxyHandlerTest {
         sampleMethodHandler.registerPerAccept(mediaType2, mock(AcceptMapper.class));
         sampleMethodHandler.registerPerAccept(mediaType3, mock(AcceptMapper.class));
         sampleMethodHandler.registerPerContentType(mediaType4, mock(ContentTypeMapper.class));
-        supportedMethods.forEach(method -> handlerWithOptionsSupport.registerMethodHandler(
+        supportedMethods.forEach(method -> handlerWithCorsSupport.registerMethodHandler(
                 method,
                 c -> sampleMethodHandler
         ));
@@ -364,15 +364,15 @@ public class LambdaProxyHandlerTest {
                 .withContext(context)
                 .build();
 
-        ApiGatewayProxyResponse response = handlerWithOptionsSupport.handleRequest(request, context);
+        ApiGatewayProxyResponse response = handlerWithCorsSupport.handleRequest(request, context);
 
         assertThat(response.getStatusCode()).isEqualTo(BAD_REQUEST.getStatusCode());
         assertThat(response.getBody()).contains(String.format("Options method should include the %s header", ACCESS_CONTROL_REQUEST_METHOD.toLowerCase()));
     }
 
     @Test
-    public void optionsSupportShouldReturnBadRequestForNonRegisteredMethod() {
-        LambdaProxyHandler<Configuration> handlerWithOptionsSupport = new TestLambdaProxyHandler(true);
+    public void corsSupportShouldReturnBadRequestForNonRegisteredMethod() {
+        LambdaProxyHandler<Configuration> handlerWithCORSSupport = new TestLambdaProxyHandler(true);
         String methodBeingInvestigated = "GET";
         Collection<String> supportedMethods = singletonList("POST");
         MediaType mediaType1 = new MediaType("application", "type1");
@@ -387,7 +387,7 @@ public class LambdaProxyHandlerTest {
         sampleMethodHandler.registerPerAccept(mediaType2, mock(AcceptMapper.class));
         sampleMethodHandler.registerPerAccept(mediaType3, mock(AcceptMapper.class));
         sampleMethodHandler.registerPerContentType(mediaType4, mock(ContentTypeMapper.class));
-        supportedMethods.forEach(method -> handlerWithOptionsSupport.registerMethodHandler(
+        supportedMethods.forEach(method -> handlerWithCORSSupport.registerMethodHandler(
                 method,
                 c -> sampleMethodHandler
         ));
@@ -404,15 +404,15 @@ public class LambdaProxyHandlerTest {
                 .withContext(context)
                 .build();
 
-        ApiGatewayProxyResponse response = handlerWithOptionsSupport.handleRequest(request, context);
+        ApiGatewayProxyResponse response = handlerWithCORSSupport.handleRequest(request, context);
 
         assertThat(response.getStatusCode()).isEqualTo(BAD_REQUEST.getStatusCode());
         assertThat(response.getBody()).isEqualTo(String.format("Lambda cannot handle the method %s", methodBeingInvestigated.toLowerCase()));
     }
 
     @Test
-    public void optionsSupportShouldReturnBadRequestWhenRequiredHeadersNotPresent() {
-        LambdaProxyHandler<Configuration> handlerWithOptionsSupport = new TestLambdaProxyHandler(true);
+    public void corsSupportShouldReturnBadRequestWhenRequiredHeadersNotPresent() {
+        LambdaProxyHandler<Configuration> handlerWithCORSSupport = new TestLambdaProxyHandler(true);
         String methodBeingInvestigated = "GET";
         Collection<String> supportedMethods = asList(methodBeingInvestigated, "POST");
         MediaType mediaType1 = new MediaType("application", "type1");
@@ -427,7 +427,7 @@ public class LambdaProxyHandlerTest {
         sampleMethodHandler.registerPerAccept(mediaType2, mock(AcceptMapper.class));
         sampleMethodHandler.registerPerAccept(mediaType3, mock(AcceptMapper.class));
         sampleMethodHandler.registerPerContentType(mediaType4, mock(ContentTypeMapper.class));
-        supportedMethods.forEach(method -> handlerWithOptionsSupport.registerMethodHandler(
+        supportedMethods.forEach(method -> handlerWithCORSSupport.registerMethodHandler(
                 method,
                 c -> sampleMethodHandler
         ));
@@ -442,7 +442,7 @@ public class LambdaProxyHandlerTest {
                 .withContext(context)
                 .build();
 
-        ApiGatewayProxyResponse response = handlerWithOptionsSupport.handleRequest(request, context);
+        ApiGatewayProxyResponse response = handlerWithCORSSupport.handleRequest(request, context);
 
         assertThat(response.getStatusCode()).isEqualTo(BAD_REQUEST.getStatusCode());
         assertThat(response.getBody()).contains(String.format("The required header(s) not present: %s", String.join(", ", requiredHeaders.stream().map(String::toLowerCase).collect(toList()))));
@@ -477,8 +477,8 @@ public class LambdaProxyHandlerTest {
 
     private class TestLambdaProxyHandler extends LambdaProxyHandler<Configuration> {
 
-        public TestLambdaProxyHandler(boolean optionsSupport) {
-            super(optionsSupport);
+        public TestLambdaProxyHandler(boolean corsSupport) {
+            super(corsSupport);
         }
 
         @Override

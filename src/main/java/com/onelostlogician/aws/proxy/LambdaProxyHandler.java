@@ -30,15 +30,15 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
     private static final String ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method".toLowerCase();
     private static final String ACCESS_CONTROL_REQUEST_HEADERS = "Access-Control-Request-Headers".toLowerCase();
     private final Logger logger = Logger.getLogger(getClass());
-    private final boolean optionsSupport;
+    private final boolean corsSupport;
     private final Map<String, Function<MethodHandlerConfiguration, MethodHandler>> methodHandlerMap;
 
-    public LambdaProxyHandler(boolean withOptionsSupport) {
-        this(withOptionsSupport, new HashMap<>());
+    public LambdaProxyHandler(boolean withCORSSupport) {
+        this(withCORSSupport, new HashMap<>());
     }
 
-    public LambdaProxyHandler(boolean withOptionsSupport, Map<String, Function<MethodHandlerConfiguration, MethodHandler>> methodHandlerMap) {
-        this.optionsSupport = withOptionsSupport;
+    public LambdaProxyHandler(boolean withCORSSupport, Map<String, Function<MethodHandlerConfiguration, MethodHandler>> methodHandlerMap) {
+        this.corsSupport = withCORSSupport;
         this.methodHandlerMap = keyValuesToLowerCase(methodHandlerMap);
     }
 
@@ -61,8 +61,8 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
             String method = request.getHttpMethod().toLowerCase();
             logger.info("Method: " + method + "\n");
 
-            if (optionsSupport && method.toLowerCase().equals("options")) {
-                handleOptionsRequest(request, configuration);
+            if (corsSupport && method.toLowerCase().equals("options")) {
+                handleCORSRequest(request, configuration);
             }
             else if (!methodHandlerMap.keySet().contains(method)) {
                 ApiGatewayProxyResponse wrongMethod =
@@ -119,7 +119,7 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
         return response;
     }
 
-    private void handleOptionsRequest(
+    private void handleCORSRequest(
             ApiGatewayProxyRequest request,
             MethodHandlerConfiguration configuration
     ) throws LambdaException {
@@ -168,12 +168,12 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
         responseHeaders.put("Access-Control-Allow-Origin", "*");
         responseHeaders.put("Access-Control-Allow-Headers", proposedRequestHeaders.stream().collect(Collectors.joining(", ")));
         responseHeaders.put("Access-Control-Allow-Methods", methodHandlerMap.keySet().stream().collect(Collectors.joining(", ")));
-        ApiGatewayProxyResponse optionsOk =
+        ApiGatewayProxyResponse corsOk =
                 new ApiGatewayProxyResponseBuilder()
                         .withStatusCode(OK.getStatusCode())
                         .withHeaders(responseHeaders)
                         .build();
-        throw new LambdaException(optionsOk);
+        throw new LambdaException(corsOk);
     }
 
     private MethodHandler<?, ?> getMethodHandler(MethodHandlerConfiguration configuration, String method) {

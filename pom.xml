@@ -16,8 +16,7 @@
         </developer>
     </developers>
     <name>aws-lambda-proxy-java</name>
-    <description>Templates to simplify the writing of Java request-handlers for use with AWS Api-Gateway methods that use Lambda Proxy-Integration.
-    </description>
+    <description>Templates to simplify the writing of Java request-handlers for use with AWS Api-Gateway methods that use Lambda Proxy-Integration.</description>
     <url>https://github.com/gabrielle-anderson/aws-lambda-proxy-java</url>
 
     <licenses>
