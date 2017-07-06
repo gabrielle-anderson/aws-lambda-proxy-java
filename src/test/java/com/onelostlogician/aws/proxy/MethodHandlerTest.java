@@ -1,6 +1,7 @@
 package com.onelostlogician.aws.proxy;
 
 import com.amazonaws.services.lambda.runtime.Context;
+import com.google.common.net.MediaType;
 import com.onelostlogician.aws.proxy.fixtures.ApiGatewayProxyRequestBuilder;
 import com.onelostlogician.aws.proxy.fixtures.SampleMethodHandler;
 import com.onelostlogician.aws.proxy.fixtures.TestingLogger;
@@ -8,10 +9,13 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.junit.Before;
 import org.junit.Test;
 
-import javax.ws.rs.core.MediaType;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
+import static com.google.common.net.MediaType.create;
 import static com.onelostlogician.aws.proxy.Util.randomiseKeyValues;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
@@ -33,12 +37,12 @@ public class MethodHandlerTest {
     private AcceptMapper<Integer> acceptMapper3;
     private Context context;
 
-    private static final MediaType CONTENT_TYPE_1 = new MediaType("application", "ContentType1");
-    private static final MediaType CONTENT_TYPE_2 = new MediaType("application", "ContentType2");
-    private static final MediaType CONTENT_TYPE_3 = new MediaType("application", "ContentType3");
-    private static final MediaType ACCEPT_TYPE_1 = new MediaType("application", "AcceptType1");
-    private static final MediaType ACCEPT_TYPE_2 = new MediaType("application", "AcceptType2");
-    private static final MediaType ACCEPT_TYPE_3 = new MediaType("application", "AcceptType3");
+    private static final MediaType CONTENT_TYPE_1 = create("application", "ContentType1");
+    private static final MediaType CONTENT_TYPE_2 = create("application", "ContentType2");
+    private static final MediaType CONTENT_TYPE_3 = create("application", "ContentType3");
+    private static final MediaType ACCEPT_TYPE_1 = create("application", "AcceptType1");
+    private static final MediaType ACCEPT_TYPE_2 = create("application", "AcceptType2");
+    private static final MediaType ACCEPT_TYPE_3 = create("application", "AcceptType3");
 
     @Before
     public void setup() {
@@ -60,9 +64,9 @@ public class MethodHandlerTest {
 
     @Test
     public void shouldReturnUnsupportedMediaTypeIfNoContentTypeMapperRegistered() throws Exception {
-        List<ParameterisedMediaType> contentTypes = asList(new ParameterisedMediaType(CONTENT_TYPE_1, new HashMap<>()), new ParameterisedMediaType(CONTENT_TYPE_2, new HashMap<>()));
+        List<MediaType> contentTypes = asList(CONTENT_TYPE_1, CONTENT_TYPE_2);
 
-        ApiGatewayProxyResponse response = sampleMethodHandler.handle(request, contentTypes, singletonList(new ParameterisedMediaType(ACCEPT_TYPE_1, new HashMap<>())), context);
+        ApiGatewayProxyResponse response = sampleMethodHandler.handle(request, contentTypes, singletonList(ACCEPT_TYPE_1), context);
 
         assertThat(response.getStatusCode()).isEqualTo(UNSUPPORTED_MEDIA_TYPE.getStatusCode());
         assertThat(response.getBody()).contains(String.format("Content-Types %s are not supported", contentTypes));
@@ -71,9 +75,9 @@ public class MethodHandlerTest {
     @Test
     public void shouldReturnUnsupportedMediaTypeIfNoAcceptMapperRegistered() throws Exception {
         sampleMethodHandler.registerPerContentType(CONTENT_TYPE_1, contentTypeMapper1);
-        List<ParameterisedMediaType> acceptTypes = asList(new ParameterisedMediaType(ACCEPT_TYPE_1, new HashMap<>()), new ParameterisedMediaType(ACCEPT_TYPE_2, new HashMap<>()));
+        List<MediaType> acceptTypes = asList(ACCEPT_TYPE_1, ACCEPT_TYPE_2);
 
-        ApiGatewayProxyResponse response = sampleMethodHandler.handle(request, singletonList(new ParameterisedMediaType(CONTENT_TYPE_1, new HashMap<>())), acceptTypes, context);
+        ApiGatewayProxyResponse response = sampleMethodHandler.handle(request, singletonList(CONTENT_TYPE_1), acceptTypes, context);
 
         assertThat(response.getStatusCode()).isEqualTo(UNSUPPORTED_MEDIA_TYPE.getStatusCode());
         assertThat(response.getBody()).contains(String.format("Accept types %s are not supported", acceptTypes));
@@ -85,7 +89,7 @@ public class MethodHandlerTest {
         sampleMethodHandler.registerPerAccept(ACCEPT_TYPE_1, acceptMapper1);
         when(contentTypeMapper1.toInput(request, context)).thenThrow(new RuntimeException());
 
-        sampleMethodHandler.handle(request, singletonList(new ParameterisedMediaType(CONTENT_TYPE_1, new HashMap<>())), singletonList(new ParameterisedMediaType(ACCEPT_TYPE_1, new HashMap<>())), context);
+        sampleMethodHandler.handle(request, singletonList(CONTENT_TYPE_1), singletonList(ACCEPT_TYPE_1), context);
     }
 
     @Test
@@ -98,7 +102,7 @@ public class MethodHandlerTest {
         sampleMethodHandler.registerExceptionMap(RuntimeException.class, e -> expectedResponse);
         when(contentTypeMapper1.toInput(request, context)).thenThrow(new RuntimeException());
 
-        ApiGatewayProxyResponse response = sampleMethodHandler.handle(request, singletonList(new ParameterisedMediaType(CONTENT_TYPE_1, new HashMap<>())), singletonList(new ParameterisedMediaType(ACCEPT_TYPE_1, new HashMap<>())), context);
+        ApiGatewayProxyResponse response = sampleMethodHandler.handle(request, singletonList(CONTENT_TYPE_1), singletonList(ACCEPT_TYPE_1), context);
 
         assertThat(response).isEqualTo(expectedResponse);
     }
@@ -113,7 +117,7 @@ public class MethodHandlerTest {
                 .withStatusCode(OK.getStatusCode())
                 .build());
 
-        ApiGatewayProxyResponse response = sampleMethodHandler.handle(request, singletonList(new ParameterisedMediaType(CONTENT_TYPE_1, new HashMap<>())), singletonList(new ParameterisedMediaType(ACCEPT_TYPE_1, new HashMap<>())), context);
+        ApiGatewayProxyResponse response = sampleMethodHandler.handle(request, singletonList(CONTENT_TYPE_1), singletonList(ACCEPT_TYPE_1), context);
 
         assertThat(response.getStatusCode()).isEqualTo(OK.getStatusCode());
     }
@@ -130,7 +134,7 @@ public class MethodHandlerTest {
                 .withStatusCode(OK.getStatusCode())
                 .build());
 
-        sampleMethodHandler.handle(request, asList(new ParameterisedMediaType(CONTENT_TYPE_2, new HashMap<>()), new ParameterisedMediaType(CONTENT_TYPE_3, new HashMap<>())), asList(new ParameterisedMediaType(ACCEPT_TYPE_2, new HashMap<>()), new ParameterisedMediaType(ACCEPT_TYPE_3, new HashMap<>())), context);
+        sampleMethodHandler.handle(request, asList(CONTENT_TYPE_2, CONTENT_TYPE_3), asList(ACCEPT_TYPE_2, ACCEPT_TYPE_3), context);
 
         verify(contentTypeMapper3).toInput(request, context);
         verify(acceptMapper3).outputToResponse(output);
@@ -159,7 +163,7 @@ public class MethodHandlerTest {
                 .withStatusCode(OK.getStatusCode())
                 .build());
 
-        ApiGatewayProxyResponse response = sampleMethodHandlerWithRequiredHeaders.handle(requestWithRequiredHeaders, singletonList(new ParameterisedMediaType(CONTENT_TYPE_1, new HashMap<>())), singletonList(new ParameterisedMediaType(ACCEPT_TYPE_1, new HashMap<>())), context);
+        ApiGatewayProxyResponse response = sampleMethodHandlerWithRequiredHeaders.handle(requestWithRequiredHeaders, singletonList(CONTENT_TYPE_1), singletonList(ACCEPT_TYPE_1), context);
 
         assertThat(response.getStatusCode()).isEqualTo(OK.getStatusCode());
     }
@@ -188,7 +192,7 @@ public class MethodHandlerTest {
                 .withStatusCode(OK.getStatusCode())
                 .build());
 
-        ApiGatewayProxyResponse response = sampleMethodHandlerWithRequiredHeaders.handle(requestWithRequiredHeaders, singletonList(new ParameterisedMediaType(CONTENT_TYPE_1, new HashMap<>())), singletonList(new ParameterisedMediaType(ACCEPT_TYPE_1, new HashMap<>())), context);
+        ApiGatewayProxyResponse response = sampleMethodHandlerWithRequiredHeaders.handle(requestWithRequiredHeaders, singletonList(CONTENT_TYPE_1), singletonList(ACCEPT_TYPE_1), context);
 
         assertThat(response.getStatusCode()).isEqualTo(BAD_REQUEST.getStatusCode());
         assertThat(response.getBody()).contains("The following required headers are not present: " + requiredHeaders.get(lastElementIndex).toLowerCase());

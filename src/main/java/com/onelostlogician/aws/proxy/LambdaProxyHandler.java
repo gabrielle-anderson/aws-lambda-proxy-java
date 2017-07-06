@@ -2,18 +2,17 @@ package com.onelostlogician.aws.proxy;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.google.common.net.MediaType;
 import com.onelostlogician.aws.proxy.ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder;
 import org.apache.log4j.Logger;
 import org.json.simple.JSONObject;
 
-import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response.Status;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static java.util.Arrays.asList;
@@ -28,9 +27,7 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
         implements RequestHandler<ApiGatewayProxyRequest, ApiGatewayProxyResponse> {
     private static final String ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method".toLowerCase();
     private static final String ACCESS_CONTROL_REQUEST_HEADERS = "Access-Control-Request-Headers".toLowerCase();
-    private static final String MEDIA_TYPE_PARAMETER_SEPARATOR = ";";
     private static final String MEDIA_TYPE_LIST_SEPARATOR = ",";
-    public static final String MEDIA_TYPE_PARAMETER_KEY_VALUE_SEPARATOR = "=";
     private final Logger logger = Logger.getLogger(getClass());
     private final boolean corsSupport;
     private final Map<String, Function<MethodHandlerConfiguration, MethodHandler>> methodHandlerMap;
@@ -82,8 +79,8 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
             String acceptHeader = ACCEPT.toLowerCase();
             validateHeaderOrThrow(headers, acceptHeader, UNSUPPORTED_MEDIA_TYPE);
 
-            List<ParameterisedMediaType> contentTypes;
-            List<ParameterisedMediaType> acceptTypes;
+            List<MediaType> contentTypes;
+            List<MediaType> acceptTypes;
             try {
                 String contentTypeString = requireNonNull(headers.get(contentTypeHeader)).toLowerCase();
                 contentTypes = getContentTypes(contentTypeString);
@@ -103,7 +100,6 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
             logger.info("Accept: " + acceptTypes + "\n");
 
             response = methodHandler.handle(request, contentTypes, acceptTypes, context);
-            int x = 1;
         }
         catch (Error e) {
             response = new ApiGatewayProxyResponseBuilder()
@@ -122,29 +118,11 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
         return response;
     }
 
-    private List<ParameterisedMediaType> getContentTypes(String contentTypeString) {
+    private List<MediaType> getContentTypes(String contentTypeString) {
         return Stream.of(contentTypeString.split(MEDIA_TYPE_LIST_SEPARATOR))
                 .filter(Objects::nonNull)
-                .map(mediaTypeString -> {
-                    String mediaTypeSubstring;
-                    Map<String, String> parameters;
-                    if (mediaTypeString.contains(MEDIA_TYPE_PARAMETER_SEPARATOR)) {
-                        String[] substrings = mediaTypeString.split(MEDIA_TYPE_PARAMETER_SEPARATOR);
-                        mediaTypeSubstring = substrings[0];
-                        parameters = IntStream.range(1, substrings.length)
-                                .mapToObj(i -> substrings[i])
-                                .filter(s -> s.split(MEDIA_TYPE_PARAMETER_KEY_VALUE_SEPARATOR).length == 2)
-                                .collect(toMap(
-                                   parameter -> parameter.split(MEDIA_TYPE_PARAMETER_KEY_VALUE_SEPARATOR)[0],
-                                        parameter -> parameter.split(MEDIA_TYPE_PARAMETER_KEY_VALUE_SEPARATOR)[1]
-                                ));
-                    }
-                    else {
-                        mediaTypeSubstring = mediaTypeString;
-                        parameters = new HashMap<>();
-                    }
-                    return new ParameterisedMediaType(MediaType.valueOf(mediaTypeSubstring), parameters);
-                })
+                .map(mediaType -> mediaType.replaceAll("\\s+",""))
+                .map(MediaType::parse)
                 .collect(toList());
     }
 
