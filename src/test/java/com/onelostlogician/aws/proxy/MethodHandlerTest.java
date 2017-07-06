@@ -123,6 +123,40 @@ public class MethodHandlerTest {
     }
 
     @Test
+    public void shouldIgnoreParametersWhenMatchingContentTypeAndAccept() throws Exception {
+        sampleMethodHandler.registerPerContentType(CONTENT_TYPE_1, contentTypeMapper1);
+        sampleMethodHandler.registerPerAccept(ACCEPT_TYPE_1, acceptMapper1);
+        int output = 0;
+        when(contentTypeMapper1.toInput(request, context)).thenReturn(output);
+        when(acceptMapper1.outputToResponse(output)).thenReturn(new ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder()
+                .withStatusCode(OK.getStatusCode())
+                .build());
+        MediaType contentTypeWithParameter = CONTENT_TYPE_1.withParameter("attribute", "value");
+        MediaType acceptTypeWithParameter = ACCEPT_TYPE_1.withParameter("attribute", "value");
+
+        ApiGatewayProxyResponse response = sampleMethodHandler.handle(request, singletonList(contentTypeWithParameter), singletonList(acceptTypeWithParameter), context);
+
+        assertThat(response.getStatusCode()).isEqualTo(OK.getStatusCode());
+    }
+
+    @Test
+    public void shouldIgnoreParametersWhenRegisteringContentTypeAndAccept() throws Exception {
+        MediaType contentTypeWithParameter = CONTENT_TYPE_1.withParameter("attribute", "value");
+        MediaType acceptTypeWithParameter = ACCEPT_TYPE_1.withParameter("attribute", "value");
+        sampleMethodHandler.registerPerContentType(contentTypeWithParameter, contentTypeMapper1);
+        sampleMethodHandler.registerPerAccept(acceptTypeWithParameter, acceptMapper1);
+        int output = 0;
+        when(contentTypeMapper1.toInput(request, context)).thenReturn(output);
+        when(acceptMapper1.outputToResponse(output)).thenReturn(new ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder()
+                .withStatusCode(OK.getStatusCode())
+                .build());
+
+        ApiGatewayProxyResponse response = sampleMethodHandler.handle(request, singletonList(CONTENT_TYPE_1), singletonList(ACCEPT_TYPE_1), context);
+
+        assertThat(response.getStatusCode()).isEqualTo(OK.getStatusCode());
+    }
+
+    @Test
     public void shouldReturnSuccessOfFirstAvailableAcceptAndContentTypesIfContentTypeAndAcceptRegistered() throws Exception {
         sampleMethodHandler.registerPerContentType(CONTENT_TYPE_1, contentTypeMapper1);
         sampleMethodHandler.registerPerContentType(CONTENT_TYPE_3, contentTypeMapper3);

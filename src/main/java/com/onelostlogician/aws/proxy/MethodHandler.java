@@ -38,11 +38,11 @@ public abstract class MethodHandler<Input, Output> {
     }
 
     public void registerPerContentType(MediaType mediaType, ContentTypeMapper<Input> contentTypeMapper) {
-        perContentTypeMap.put(mediaType, contentTypeMapper);
+        perContentTypeMap.put(mediaType.withoutParameters(), contentTypeMapper);
     }
 
     public void registerPerAccept(MediaType mediaType, AcceptMapper<Output> acceptMapper) {
-        perAcceptMap.put(mediaType, acceptMapper);
+        perAcceptMap.put(mediaType.withoutParameters(), acceptMapper);
     }
 
     public <E extends Exception> void registerExceptionMap(Class<E> clazz, Function<E, ApiGatewayProxyResponse> exceptionMapper) {
@@ -93,19 +93,20 @@ public abstract class MethodHandler<Input, Output> {
     }
 
     private static <T> T getMapper(List<MediaType> contentTypes, Map<MediaType, T> contentTypeMap, String errorMessage) throws LambdaException {
-        Optional<Map.Entry<MediaType, T>> maybeMapper = contentTypeMap.entrySet().stream()
-                .filter(entry -> contentTypes.contains(entry.getKey()))
-                .findFirst();
-        if (!maybeMapper.isPresent()) {
-            ApiGatewayProxyResponse unsupportedContentType = new ApiGatewayProxyResponseBuilder()
-                    .withStatusCode(UNSUPPORTED_MEDIA_TYPE.getStatusCode())
-                    .withBody(String.format(errorMessage, contentTypes))
-                    .build();
-            throw new LambdaException(unsupportedContentType);
-        }
-        else {
-            return maybeMapper.get().getValue();
-        }
+        List<MediaType> contentTypesWithoutParameters = contentTypes.stream()
+                .map(MediaType::withoutParameters)
+                .collect(toList());
+        return contentTypesWithoutParameters.stream()
+                .map(contentTypeMap::get)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElseThrow(() -> {
+                    ApiGatewayProxyResponse unsupportedContentType = new ApiGatewayProxyResponseBuilder()
+                            .withStatusCode(UNSUPPORTED_MEDIA_TYPE.getStatusCode())
+                            .withBody(String.format(errorMessage, contentTypes))
+                            .build();
+                    return new LambdaException(unsupportedContentType);
+                });
     }
 
     public Collection<String> getRequiredHeaders() {
