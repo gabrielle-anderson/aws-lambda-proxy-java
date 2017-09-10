@@ -501,6 +501,38 @@ public class LambdaProxyHandlerTest {
     }
 
     @Test
+    public void corsSupportShouldReturnAccessControlAllowOriginHeaderFromMethodHandler() throws Exception {
+        LambdaProxyHandler<Configuration> handlerWithCORSSupport = new TestLambdaProxyHandler(true);
+        String someHeader = "someHeader";
+        String someValue = "someValue";
+        Map<String, String> requestHeaders = new ConcurrentHashMap<>();
+        requestHeaders.put(CONTENT_TYPE, CONTENT_TYPE_1.toString());
+        requestHeaders.put(ACCEPT, ACCEPT_TYPE_1.toString());
+        requestHeaders.put(someHeader, someValue);
+        ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
+                .withHttpMethod(METHOD)
+                .withHeaders(requestHeaders)
+                .withContext(context)
+                .build();
+        Map<String, String> responseHeaders = new ConcurrentHashMap<>();
+        responseHeaders.put(someHeader, someValue);
+        String accessControlAllowOriginKey = "access-control-allow-origin";
+        String accessControlAllowOriginValue = "*";
+        when(methodHandler.handle(request, singletonList(CONTENT_TYPE_1), singletonList(ACCEPT_TYPE_1), context))
+                .thenReturn(new ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder()
+                        .withStatusCode(OK.getStatusCode())
+                        .withHeaders(responseHeaders)
+                        .build());
+        handlerWithCORSSupport.registerMethodHandler(METHOD, c -> methodHandler);
+
+        ApiGatewayProxyResponse response = handlerWithCORSSupport.handleRequest(request, context);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getHeaders()).containsKey(accessControlAllowOriginKey);
+        assertThat(response.getHeaders().get(accessControlAllowOriginKey)).isEqualTo(accessControlAllowOriginValue);
+    }
+
+    @Test
     public void mediaTypesAreCreatedWithLowerCaseValues() throws Exception {
         String someHeader = "someHeader";
         String someValue = "someValue";

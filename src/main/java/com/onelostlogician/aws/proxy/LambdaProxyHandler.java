@@ -7,6 +7,7 @@ import com.onelostlogician.aws.proxy.ApiGatewayProxyResponse.ApiGatewayProxyResp
 import org.apache.log4j.Logger;
 import org.json.simple.JSONObject;
 
+import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -113,6 +114,12 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
         catch (Exception e) {
             response = getServerErrorResponse("", e);
         }
+
+        Map<String, String> headers = response.getHeaders();
+        headers.put("access-control-allow-origin", "*");
+        response = response.builder()
+                .withHeaders(headers)
+                .build();
 
         logger.info(String.format("Completed response: %s with size %s.\n", response.getStatusCode(), response.getBody().length()));
         return response;

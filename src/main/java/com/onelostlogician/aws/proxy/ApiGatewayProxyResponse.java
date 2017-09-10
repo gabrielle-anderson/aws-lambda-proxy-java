@@ -35,6 +35,14 @@ public class ApiGatewayProxyResponse {
         this.isBase64Encoded = isBase64Encoded;
     }
 
+    public ApiGatewayProxyResponseBuilder builder() {
+        return new ApiGatewayProxyResponseBuilder()
+                .withStatusCode(this.getStatusCode())
+                .withHeaders(this.getHeaders())
+                .withBody(this.getBody())
+                .withBase64Encoded(this.getIsBase64Encoded());
+    }
+
     public static class ApiGatewayProxyResponseBuilder {
         private int statusCode = 0;
         private Map<String, String> headers = new HashMap<>();
