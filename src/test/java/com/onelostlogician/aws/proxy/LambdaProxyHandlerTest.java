@@ -516,7 +516,7 @@ public class LambdaProxyHandlerTest {
                 .build();
         Map<String, String> responseHeaders = new ConcurrentHashMap<>();
         responseHeaders.put(someHeader, someValue);
-        String accessControlAllowOriginKey = "access-control-allow-origin";
+        String accessControlAllowOriginKey = "Access-Control-Allow-Origin";
         String accessControlAllowOriginValue = "*";
         when(methodHandler.handle(request, singletonList(CONTENT_TYPE_1), singletonList(ACCEPT_TYPE_1), context))
                 .thenReturn(new ApiGatewayProxyResponse.ApiGatewayProxyResponseBuilder()

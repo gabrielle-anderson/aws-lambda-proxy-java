@@ -115,11 +115,13 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
             response = getServerErrorResponse("", e);
         }
 
-        Map<String, String> headers = response.getHeaders();
-        headers.put("access-control-allow-origin", "*");
-        response = response.builder()
-                .withHeaders(headers)
-                .build();
+        if (!request.getHttpMethod().toLowerCase().equals("options")) {
+            Map<String, String> headers = response.getHeaders();
+            headers.put("Access-Control-Allow-Origin", "*");
+            response = response.builder()
+                    .withHeaders(headers)
+                    .build();
+        }
 
         logger.info(String.format("Completed response: %s with size %s.\n", response.getStatusCode(), response.getBody().length()));
         return response;
