@@ -28,6 +28,7 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
         implements RequestHandler<ApiGatewayProxyRequest, ApiGatewayProxyResponse> {
     private static final String ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method".toLowerCase();
     private static final String ACCESS_CONTROL_REQUEST_HEADERS = "Access-Control-Request-Headers".toLowerCase();
+    private static final String ORIGIN_HEADER = "Origin".toLowerCase();
     private static final String MEDIA_TYPE_LIST_SEPARATOR = ",";
     private final Logger logger = Logger.getLogger(getClass());
     private final boolean corsSupport;
@@ -140,6 +141,13 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
             MethodHandlerConfiguration configuration
     ) throws LambdaException {
         Map<String, String> headers = keyValuesToLowerCase(request.getHeaders());
+        if (!headers.keySet().contains(ORIGIN_HEADER)) {
+            ApiGatewayProxyResponse wrongHeaders = new ApiGatewayProxyResponseBuilder()
+                    .withStatusCode(BAD_REQUEST.getStatusCode())
+                    .withBody(String.format("Options method should include the %s header", ORIGIN_HEADER))
+                    .build();
+            throw new LambdaException(wrongHeaders);
+        }
         if (!headers.keySet().contains(ACCESS_CONTROL_REQUEST_METHOD)) {
             ApiGatewayProxyResponse wrongHeaders = new ApiGatewayProxyResponseBuilder()
                             .withStatusCode(BAD_REQUEST.getStatusCode())
@@ -181,9 +189,9 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
         }
 
         Map<String, String> responseHeaders = new HashMap<>();
-        responseHeaders.put("Access-Control-Allow-Origin", "*");
+        responseHeaders.put("Access-Control-Allow-Origin", headers.get(ORIGIN_HEADER));
         responseHeaders.put("Access-Control-Allow-Headers", proposedRequestHeaders.stream().collect(Collectors.joining(", ")));
-        responseHeaders.put("Access-Control-Allow-Methods", methodHandlerMap.keySet().stream().collect(Collectors.joining(", ")));
+        responseHeaders.put("Access-Control-Allow-Methods", headers.get(ACCESS_CONTROL_REQUEST_METHOD));
         ApiGatewayProxyResponse corsOk =
                 new ApiGatewayProxyResponseBuilder()
                         .withStatusCode(OK.getStatusCode())

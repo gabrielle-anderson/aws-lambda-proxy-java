@@ -44,6 +44,7 @@ public class LambdaProxyHandlerTest {
     private static final String METHOD = "GET";
     private static final String ACCESS_CONTROL_REQUEST_METHOD = "Access-Control-Request-Method";
     private static final String ACCESS_CONTROL_REQUEST_HEADERS = "Access-Control-Request-Headers";
+    private static final String ORIGIN_HEADER = "Origin";
 
     private final LambdaProxyHandler<Configuration> handler;
 
@@ -362,6 +363,8 @@ public class LambdaProxyHandlerTest {
         requestHeaders.add("header3");
         headers.put("Access-Control-Request-Headers", String.join(", ", requestHeaders));
         headers.put("Content-Type", mediaType4.toString());
+        String origin = "http://127.0.0.1:8888";
+        headers.put("Origin", origin);
         randomiseKeyValues(headers);
         ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
                 .withHttpMethod("OPTIONS")
@@ -374,12 +377,54 @@ public class LambdaProxyHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(OK.getStatusCode());
         Map<String, String> responseHeaders = response.getHeaders();
         assertThat(responseHeaders).containsKey("Access-Control-Allow-Origin");
-        assertThat(responseHeaders.get("Access-Control-Allow-Origin")).isEqualTo("*");
+        assertThat(responseHeaders.get("Access-Control-Allow-Origin")).isEqualTo(origin);
         assertThat(responseHeaders).containsKey("Access-Control-Allow-Headers");
         assertThat(asList(responseHeaders.get("Access-Control-Allow-Headers").split(", ")))
                 .containsAll(requestHeaders.stream().map(String::toLowerCase).collect(toList()));
         assertThat(responseHeaders).containsKey("Access-Control-Allow-Methods");
-        assertThat(asList(responseHeaders.get("Access-Control-Allow-Methods").split(", "))).containsAll(supportedMethods.stream().map(String::toLowerCase).collect(toList()));
+        assertThat(responseHeaders.get("Access-Control-Allow-Methods")).isEqualTo(methodBeingInvestigated);
+    }
+
+    @Test
+    public void corsSupportShouldReturnBadRequestWhenRequestDoesNotSpecifyOrigin() {
+        LambdaProxyHandler<Configuration> handlerWithCORSSupport = new TestLambdaProxyHandler(true);
+        String methodBeingInvestigated = "GET";
+        Collection<String> supportedMethods = asList(methodBeingInvestigated, "POST");
+        MediaType mediaType1 = MediaType.create("application", "type1");
+        MediaType mediaType2 = MediaType.create("application", "type2");
+        MediaType mediaType3 = MediaType.create("application", "type3");
+        MediaType mediaType4 = MediaType.create("application", "type4");
+        Collection<String> requiredHeaders = Stream.of("header1", "header2")
+                .map(Util::randomizeCase)
+                .collect(toList());
+        SampleMethodHandler sampleMethodHandler = new SampleMethodHandler(requiredHeaders);
+        sampleMethodHandler.registerPerAccept(mediaType1, mock(AcceptMapper.class));
+        sampleMethodHandler.registerPerAccept(mediaType2, mock(AcceptMapper.class));
+        sampleMethodHandler.registerPerAccept(mediaType3, mock(AcceptMapper.class));
+        sampleMethodHandler.registerPerContentType(mediaType4, mock(ContentTypeMapper.class));
+        supportedMethods.forEach(method -> handlerWithCORSSupport.registerMethodHandler(
+                method,
+                c -> sampleMethodHandler
+        ));
+        Map<String, String> headers = new ConcurrentHashMap<>();
+        headers.put("Access-Control-Request-Method", methodBeingInvestigated);
+        Collection<String> requestHeaders = requiredHeaders.stream()
+                .map(Util::randomizeCase)
+                .collect(toSet());
+        requestHeaders.add("header3");
+        headers.put("Access-Control-Request-Headers", String.join(", ", requestHeaders));
+        headers.put("Content-Type", mediaType4.toString());
+        randomiseKeyValues(headers);
+        ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
+                .withHttpMethod("OPTIONS")
+                .withHeaders(headers)
+                .withContext(context)
+                .build();
+
+        ApiGatewayProxyResponse response = handlerWithCORSSupport.handleRequest(request, context);
+
+        assertThat(response.getStatusCode()).isEqualTo(BAD_REQUEST.getStatusCode());
+        assertThat(response.getBody()).contains(String.format("Options method should include the %s header", ORIGIN_HEADER.toLowerCase()));
     }
 
     @Test
@@ -409,6 +454,7 @@ public class LambdaProxyHandlerTest {
         requestHeaders.add("header3");
         headers.put(ACCESS_CONTROL_REQUEST_HEADERS, String.join(", ", requestHeaders));
         headers.put("Content-Type", mediaType4.toString());
+        headers.put("Origin", "http://127.0.0.1:8888");
         randomiseKeyValues(headers);
         ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
                 .withHttpMethod("OPTIONS")
@@ -449,6 +495,7 @@ public class LambdaProxyHandlerTest {
         requestHeaders.add("header3");
         headers.put(ACCESS_CONTROL_REQUEST_HEADERS, String.join(", ", requestHeaders));
         headers.put("Content-Type", mediaType4.toString());
+        headers.put("Origin", "http://127.0.0.1:8888");
         randomiseKeyValues(headers);
         ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
                 .withHttpMethod("OPTIONS")
@@ -487,6 +534,7 @@ public class LambdaProxyHandlerTest {
         headers.put(ACCESS_CONTROL_REQUEST_METHOD, methodBeingInvestigated);
         headers.put(ACCESS_CONTROL_REQUEST_HEADERS, "");
         headers.put("Content-Type", mediaType4.toString());
+        headers.put("Origin", "http://127.0.0.1:8888");
         randomiseKeyValues(headers);
         ApiGatewayProxyRequest request = new ApiGatewayProxyRequestBuilder()
                 .withHttpMethod("OPTIONS")

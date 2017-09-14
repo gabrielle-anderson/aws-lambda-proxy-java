@@ -19,7 +19,7 @@ public class Util {
     public static void randomiseKeyValues(Map<String, String> headers) {
         headers.forEach((key, value) -> {
             headers.remove(key);
-            headers.put(randomizeCase(key), randomizeCase(value));
+            headers.put(randomizeCase(key), value);
         });
     }
 }
