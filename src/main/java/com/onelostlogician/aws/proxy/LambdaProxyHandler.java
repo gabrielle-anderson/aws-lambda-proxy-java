@@ -104,6 +104,7 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
             response = methodHandler.handle(request, contentTypes, acceptTypes, context);
         }
         catch (Error e) {
+            logger.error(request);
             response = new ApiGatewayProxyResponseBuilder()
                             .withStatusCode(INTERNAL_SERVER_ERROR.getStatusCode())
                             .withBody(String.format("Failed to parse: %s", request))
@@ -113,6 +114,7 @@ public abstract class LambdaProxyHandler<MethodHandlerConfiguration extends Conf
             response = e.getResponse();
         }
         catch (Exception e) {
+            logger.error(request);
             response = getServerErrorResponse("", e);
         }
 
